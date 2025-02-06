@@ -7,6 +7,7 @@ import '../../shared/widgets/error_dialog.dart';
 import '../../shared/widgets/animated_chat_message.dart';
 import '../../core/services/voice_service.dart';
 import 'settings_page.dart';
+import 'package:flutter/services.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -57,36 +58,67 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildChatInterface() {
-    return Column(
-      children: [
-        Expanded(
-          child: ListView.builder(
-            itemCount: _messages.length,
-            itemBuilder: (context, index) => GestureDetector(
-              // Long-press a message to trigger voice output.
-              onLongPress: () => _voiceOutput(_messages[index].text),
-              child: _buildChatMessage(_messages[index]),
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Column(
+        children: [
+          Expanded(
+            child: ListView.builder(
+              itemCount: _messages.length,
+              itemBuilder: (context, index) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                child: _buildChatMessage(_messages[index]),
+              ),
             ),
           ),
-        ),
-        _buildInputArea(),
-      ],
+          _buildInputArea(),
+        ],
+      ),
     );
   }
 
   Widget _buildChatMessage(Message message) {
-    return AnimatedChatMessage(
-      message: message.text,
-      isUser: message.isUserMessage,
-      onEdit: (updatedText) {
-        setState(() {
-          final index = _messages.indexOf(message);
-          if (index != -1) {
-            _messages[index] = Message(
-                text: updatedText, isUserMessage: message.isUserMessage);
-          }
-        });
-      },
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Align(
+          alignment: message.isUserMessage
+              ? Alignment.centerRight
+              : Alignment.centerLeft,
+          child: Container(
+            padding: const EdgeInsets.all(8.0),
+            margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
+            decoration: BoxDecoration(
+              color:
+                  message.isUserMessage ? Colors.blue[100] : Colors.grey[200],
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(message.text),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(left: 8.0, bottom: 8.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              AnimatedChatMessageActions(
+                message: message,
+                onEdit: (updatedText) {
+                  setState(() {
+                    final index = _messages.indexOf(message);
+                    if (index != -1) {
+                      _messages[index] = Message(
+                          text: updatedText,
+                          isUserMessage: message.isUserMessage);
+                    }
+                  });
+                },
+                onVoiceOutput: () => _voiceOutput(message.text),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -281,7 +313,12 @@ class _ChatScreenState extends State<ChatScreen> {
                   desktop: Row(
                     children: [
                       SizedBox(width: 300, child: _buildSettingsPanel()),
-                      Expanded(child: _buildChatInterface()),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: _buildChatInterface(),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -300,6 +337,46 @@ class _ChatScreenState extends State<ChatScreen> {
               child: const Icon(Icons.mic),
             )
           : null,
+    );
+  }
+}
+
+class AnimatedChatMessageActions extends StatelessWidget {
+  final Message message;
+  final Function(String) onEdit;
+  final VoidCallback onVoiceOutput;
+
+  const AnimatedChatMessageActions({
+    super.key,
+    required this.message,
+    required this.onEdit,
+    required this.onVoiceOutput,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.edit),
+          onPressed: () {
+            // Trigger edit mode in the parent widget
+          },
+        ),
+        IconButton(
+          icon: const Icon(Icons.copy),
+          onPressed: () {
+            Clipboard.setData(ClipboardData(text: message.text));
+            ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Copied to clipboard')));
+          },
+        ),
+        IconButton(
+          icon: const Icon(Icons.record_voice_over),
+          onPressed: onVoiceOutput,
+        ),
+      ],
     );
   }
 }
