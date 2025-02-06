@@ -18,6 +18,9 @@ class _ChatScreenState extends State<ChatScreen> {
   final OllamaService _ollamaService = OllamaService();
   bool _isLoading = false;
   String _selectedModel = 'llama3.2'; // Default model
+  String _selectedEndpoint = 'http://localhost:11434'; // Default endpoint
+  final TextEditingController _endpointController =
+      TextEditingController(text: 'http://localhost:11434');
 
   void _addMessage(String text, bool isUserMessage) {
     setState(() {
@@ -103,7 +106,10 @@ class _ChatScreenState extends State<ChatScreen> {
         }).toList();
 
         final response = await _ollamaService.generateResponse(
-            ollamaMessages, _selectedModel);
+          ollamaMessages,
+          _selectedModel,
+          endpoint: _selectedEndpoint,
+        );
         _addMessage(response, false);
       } catch (e) {
         showDialog(
@@ -142,6 +148,19 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: Text(value),
               );
             }).toList(),
+          ),
+          const SizedBox(height: 20),
+          const Text('Endpoint URL:'),
+          TextField(
+            controller: _endpointController,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+            ),
+            onChanged: (value) {
+              setState(() {
+                _selectedEndpoint = value;
+              });
+            },
           ),
         ],
       ),

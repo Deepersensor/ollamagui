@@ -1,15 +1,17 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../models/ollama_message.dart';
 
 class OllamaService {
-  final String _baseUrl = dotenv.env['OLLAMA_API_URL'] ??
-      'http://localhost:11434'; // Default Ollama API URL
+  final String _baseUrl = 'http://localhost:11434'; // Default Ollama API URL
 
   Future<String> generateResponse(
-      List<OllamaMessage> messages, String model) async {
-    final url = Uri.parse('$_baseUrl/api/chat');
+    List<OllamaMessage> messages,
+    String model, {
+    String? endpoint,
+  }) async {
+    final baseUrl = endpoint ?? _baseUrl;
+    final url = Uri.parse('$baseUrl/api/chat');
     try {
       final response = await http.post(
         url,
