@@ -4,6 +4,9 @@ import '../../shared/widgets/responsive_layout.dart';
 import '../../core/services/ollama_service.dart';
 import '../../core/models/ollama_message.dart';
 import '../../shared/widgets/error_dialog.dart';
+import '../../shared/widgets/animated_chat_message.dart';
+import '../../core/services/voice_service.dart';
+import 'settings_page.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -21,6 +24,31 @@ class _ChatScreenState extends State<ChatScreen> {
   String _selectedEndpoint = 'http://localhost:11434'; // Default endpoint
   final TextEditingController _endpointController =
       TextEditingController(text: 'http://localhost:11434');
+  List<String> _availableModels = ['llama3.2', 'mistral'];
+  final VoiceService _voiceService = VoiceService();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAvailableModels();
+  }
+
+  Future<void> _loadAvailableModels() async {
+    try {
+      final models = await _ollamaService.getAvailableModels();
+      setState(() {
+        _availableModels = models;
+        if (!models.contains(_selectedModel) && models.isNotEmpty) {
+          _selectedModel = models.first;
+        }
+      });
+    } catch (e) {
+      showDialog(
+        context: context,
+        builder: (context) => ErrorDialog(message: e.toString()),
+      );
+    }
+  }
 
   void _addMessage(String text, bool isUserMessage) {
     setState(() {
@@ -34,9 +62,11 @@ class _ChatScreenState extends State<ChatScreen> {
         Expanded(
           child: ListView.builder(
             itemCount: _messages.length,
-            itemBuilder: (context, index) {
-              return _buildChatMessage(_messages[index]);
-            },
+            itemBuilder: (context, index) => GestureDetector(
+              // Long-press a message to trigger voice output.
+              onLongPress: () => _voiceOutput(_messages[index].text),
+              child: _buildChatMessage(_messages[index]),
+            ),
           ),
         ),
         _buildInputArea(),
@@ -45,18 +75,18 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildChatMessage(Message message) {
-    return Align(
-      alignment:
-          message.isUserMessage ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        padding: const EdgeInsets.all(8.0),
-        margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
-        decoration: BoxDecoration(
-          color: message.isUserMessage ? Colors.blue[100] : Colors.grey[200],
-          borderRadius: BorderRadius.circular(8.0),
-        ),
-        child: Text(message.text),
-      ),
+    return AnimatedChatMessage(
+      message: message.text,
+      isUser: message.isUserMessage,
+      onEdit: (updatedText) {
+        setState(() {
+          final index = _messages.indexOf(message);
+          if (index != -1) {
+            _messages[index] = Message(
+                text: updatedText, isUserMessage: message.isUserMessage);
+          }
+        });
+      },
     );
   }
 
@@ -68,20 +98,34 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: TextField(
               controller: _textController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: 'Type a message...',
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.mic),
+                  onPressed: _startVoiceInput,
+                ),
               ),
-              onSubmitted: (text) {
-                _sendMessage(text);
-              },
+              onSubmitted: _sendMessage,
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.send),
-            onPressed: () {
-              _sendMessage(_textController.text);
-            },
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () => _sendMessage(_textController.text),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.deepPurple,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: const [
+                  BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 8,
+                      offset: Offset(2, 2))
+                ],
+              ),
+              child: const Icon(Icons.send, color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -124,6 +168,31 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _startVoiceInput() async {
+    try {
+      // For example purposes, assume an audio file path.
+      const audioFilePath = '/path/to/audio.wav';
+      final transcription = await _voiceService.transcribeVoice(audioFilePath);
+      _sendMessage(transcription);
+    } catch (e) {
+      showDialog(
+        context: context,
+        builder: (context) => ErrorDialog(message: e.toString()),
+      );
+    }
+  }
+
+  Future<void> _voiceOutput(String text) async {
+    try {
+      await _voiceService.speakText(text);
+    } catch (e) {
+      showDialog(
+        context: context,
+        builder: (context) => ErrorDialog(message: e.toString()),
+      );
+    }
+  }
+
   Widget _buildSettingsPanel() {
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -141,8 +210,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 _selectedModel = newValue!;
               });
             },
-            items: <String>['llama3.2', 'mistral'] // Add more models as needed
-                .map<DropdownMenuItem<String>>((String value) {
+            items:
+                _availableModels.map<DropdownMenuItem<String>>((String value) {
               return DropdownMenuItem<String>(
                 value: value,
                 child: Text(value),
@@ -169,27 +238,53 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile = MediaQuery.of(context).size.width < 800;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Ollama GUI'),
+        actions: isMobile
+            ? [
+                IconButton(
+                  icon: const Icon(Icons.settings),
+                  onPressed: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => SettingsPage(
+                          selectedModel: _selectedModel,
+                          selectedEndpoint: _selectedEndpoint,
+                          availableModels: _availableModels,
+                          onModelChanged: (newModel) =>
+                              setState(() => _selectedModel = newModel),
+                          onEndpointChanged: (newEndpoint) =>
+                              setState(() => _selectedEndpoint = newEndpoint),
+                        ),
+                      ),
+                    );
+                  },
+                )
+              ]
+            : null,
       ),
       body: Stack(
         children: [
-          ResponsiveLayout(
-            mobile: _buildChatInterface(),
-            tablet: Row(
-              children: [
-                Expanded(flex: 2, child: _buildChatInterface()),
-                Expanded(flex: 1, child: _buildSettingsPanel()),
-              ],
-            ),
-            desktop: Row(
-              children: [
-                SizedBox(width: 300, child: _buildSettingsPanel()),
-                Expanded(child: _buildChatInterface()),
-              ],
-            ),
-          ),
+          isMobile
+              ? _buildChatInterface()
+              : ResponsiveLayout(
+                  mobile: _buildChatInterface(),
+                  tablet: Row(
+                    children: [
+                      Expanded(flex: 2, child: _buildChatInterface()),
+                      Expanded(flex: 1, child: _buildSettingsPanel()),
+                    ],
+                  ),
+                  desktop: Row(
+                    children: [
+                      SizedBox(width: 300, child: _buildSettingsPanel()),
+                      Expanded(child: _buildChatInterface()),
+                    ],
+                  ),
+                ),
           if (_isLoading)
             Container(
               color: Colors.black.withOpacity(0.5),
@@ -199,6 +294,12 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
         ],
       ),
+      floatingActionButton: !isMobile
+          ? FloatingActionButton(
+              onPressed: _startVoiceInput,
+              child: const Icon(Icons.mic),
+            )
+          : null,
     );
   }
 }
