@@ -37,6 +37,7 @@ dependencies:
   path_provider: ^2.1.5
   http: ^1.3.0
   flutter_dotenv: ^5.2.1
+  desktop_updater: ^1.0.2
 
 dev_dependencies:
   flutter_test:

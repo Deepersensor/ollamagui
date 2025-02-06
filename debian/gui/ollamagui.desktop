@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0.0
+Name=ollamagui
+GenericName=ollamagui
+Comment=ollama gui!
+Terminal=false
+Type=Application
+Categories=Utility;
+Keywords=Flutter;
+Icon=ollamagui
