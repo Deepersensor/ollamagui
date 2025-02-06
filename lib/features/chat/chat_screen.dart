@@ -6,7 +6,7 @@ import '../../core/models/ollama_message.dart';
 import '../../shared/widgets/error_dialog.dart';
 
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({Key? key}) : super(key: key);
+  const ChatScreen({super.key});
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
