@@ -27,6 +27,7 @@ class _ChatScreenState extends State<ChatScreen> {
       TextEditingController(text: 'http://localhost:11434');
   List<String> _availableModels = ['llama3.2', 'mistral'];
   final VoiceService _voiceService = VoiceService();
+  Process? _voiceProcess; // Added to track voice output process
 
   @override
   void initState() {
@@ -123,6 +124,8 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildInputArea() {
+    // Determine if mobile to conditionally include the mic in the TextField.
+    final isMobile = MediaQuery.of(context).size.width < 800;
     return Padding(
       padding: const EdgeInsets.all(8.0),
       child: Row(
@@ -133,10 +136,13 @@ class _ChatScreenState extends State<ChatScreen> {
               decoration: InputDecoration(
                 hintText: 'Type a message...',
                 border: const OutlineInputBorder(),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.mic),
-                  onPressed: _startVoiceInput,
-                ),
+                // Only show the mic if on mobile.
+                suffixIcon: isMobile
+                    ? IconButton(
+                        icon: const Icon(Icons.mic),
+                        onPressed: _startVoiceInput,
+                      )
+                    : null,
               ),
               onSubmitted: _sendMessage,
             ),
@@ -215,8 +221,24 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _voiceOutput(String text) async {
+    // If already speaking, kill the process to stop voice output.
+    if (_voiceProcess != null) {
+      _voiceProcess!.kill();
+      setState(() {
+        _voiceProcess = null;
+      });
+      return;
+    }
     try {
-      await _voiceService.speakText(text);
+      _voiceProcess = await _voiceService.speakText(text);
+      // When process exits, clear the reference.
+      _voiceProcess!.exitCode.then((_) {
+        if (mounted) {
+          setState(() {
+            _voiceProcess = null;
+          });
+        }
+      });
     } catch (e) {
       showDialog(
         context: context,

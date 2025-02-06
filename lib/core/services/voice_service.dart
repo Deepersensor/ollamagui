@@ -17,16 +17,16 @@ class VoiceService {
     }
   }
 
-  Future<void> speakText(String text) async {
+  // Modified: Return the Process so caller can cancel it.
+  Future<Process> speakText(String text) async {
     // Check for flite installation.
     final fliteResult = await Process.run('flite', ['-version']);
     if (fliteResult.exitCode != 0) {
       throw Exception('flite is not installed. Please install flite.');
     }
     // Execute flite CLI to speak text.
-    final result = await Process.run('flite', ['-t', text]);
-    if (result.exitCode != 0) {
-      throw Exception('Voice output failed: ${result.stderr}');
-    }
+    final process = await Process.start('flite', ['-t', text]);
+    // Optionally listen to process.exit
+    return process;
   }
 }
