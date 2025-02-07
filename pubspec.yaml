@@ -99,3 +99,5 @@ msix_config:
   identity_name: com.deepersensor.ollamagui
   msix_version: 1.0.0.0
   capabilities: internetClient, microphone
+  app_installer:
+    publish_folder_path: publish
